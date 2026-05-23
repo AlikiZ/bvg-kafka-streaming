@@ -6,6 +6,11 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: [ "CMD", "bash", "-c", "echo ruok | nc localhost 2181 | grep imok" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "2181:2181"
 
@@ -13,7 +18,8 @@ services:
     image: confluentinc/cp-kafka:7.6.0
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
     environment:
@@ -42,3 +48,20 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  # Persist the data in postgresql in a volume managed by Docker
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    environment:
+      POSTGRES_USER: bvg
+      POSTGRES_PASSWORD: bvg
+      POSTGRES_DB: bvg_delays
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # persists data across restarts
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # runs on first startup only
+
+volumes:
+  postgres_data:
